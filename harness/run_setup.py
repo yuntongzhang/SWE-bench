@@ -230,10 +230,18 @@ def setup_one_repo_version(
     )
     clone_repo(repo_full, repo_path)
     logger.info(f"[{env_name}] Cloned {repo_full} to {repo_path}")
-    create_conda_env(repo_full, version, repo_path, env_name, task)
-    logger.info(
-        f"[{env_name}] Created conda environment {env_name} for {repo_full} {version}"
-    )
+    try:
+        create_conda_env(repo_full, version, repo_path, env_name, task)
+        logger.info(
+            f"[{env_name}] Created conda environment {env_name} for {repo_full} {version}"
+        )
+    except Exception as e:
+        logger.error(
+            f"[{env_name}] Failed to set up conda environment for {repo_full} {version}: {e}"
+        )
+        # Remove the artifacts so we'll know this setup failed.
+        remove_conda_env_and_dir(env_name)
+        shutil.rmtree(repo_path)
     # "install" and "pre_install" steps are per task;
     # we don't do them here, but instead collects the commands and write them out;
     # this has already been done at a previous step
@@ -270,6 +278,23 @@ def load_task_instances(swe_bench_tasks: str):
     # if not isinstance(tasks, list):
     #     raise ValueError(f"{swe_bench_tasks} must contain an array of tasks")
     # return tasks
+
+
+def setup_is_valid(existing_env_list: List[str], instance_id: str, setup_info: Dict):
+    """
+    Check whether a setup is valid.
+    """
+    if not setup_info:
+        # If we actually need setup_map keys that don't have an env then return True here.
+        return False
+    env_name = setup_info["env_name"]
+    repo_path = setup_info["repo_path"]
+    valid = (env_name in existing_env_list) and os.path.exists(repo_path)
+    if not valid:
+        logger.warning(
+            f"[{instance_id}] Setup is not valid for {instance_id}. env_name: {env_name}, repo_path: {repo_path}"
+        )
+    return valid
 
 
 def save_setup_json_files(result_dir: str, setup_map: Dict, tasks_map: Dict):
@@ -387,6 +412,11 @@ def main(
             pool.close()
             pool.join()
     finally:
+        # Drop any setup entries that failed (i.e. not valid because missing env or repo)
+        existing_env_list = get_conda_env_names(os.getenv("CONDA_EXE"))
+        setup_map = {k: v for k, v in setup_map.items() if setup_is_valid(existing_env_list, k, v)}
+        # No need for tasks that are not in setup_map, right?
+        tasks_map = {k: v for k, v in tasks_map.items() if k in setup_map}
         # Done with the actual work.
         save_setup_json_files(result_dir, setup_map, tasks_map)
 
