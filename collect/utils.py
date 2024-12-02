@@ -1,6 +1,6 @@
 import logging
 import re
-import requests
+import httpx as requests
 import time
 
 from bs4 import BeautifulSoup

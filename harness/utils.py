@@ -1,7 +1,7 @@
 import json
 import os
 import re
-import requests
+import httpx as requests
 import subprocess
 
 from constants import (

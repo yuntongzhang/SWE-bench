@@ -1,5 +1,5 @@
 import re
-import requests
+import httpx as requests
 
 from unidiff import PatchSet
 

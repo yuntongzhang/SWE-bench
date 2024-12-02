@@ -8,6 +8,7 @@ dependencies:
     - ghapi
     - GitPython
     - python-dotenv
+    - httpx
     - requests
     - rich
     - transformers>=4.34.0
